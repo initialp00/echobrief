@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     # LLM (OpenRouter, OpenAI-compatible)
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = "anthropic/claude-3.5-sonnet"
+    openrouter_model: str = "anthropic/claude-sonnet-4.5"
+    # Cap completion size (a structured note is small); keeps free-tier keys happy.
+    openrouter_max_tokens: int = 1500
 
     # Where uploaded audio files are stored
     upload_dir: str = "/app/uploads"

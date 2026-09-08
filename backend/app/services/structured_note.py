@@ -69,6 +69,9 @@ def _structure_with_llm(transcript: str, engineer_name: str) -> StructuredNoteDa
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.2,
+        # A structured note is small; cap output so it fits limited/free-tier
+        # credit budgets (otherwise the client defaults to the model max).
+        max_tokens=settings.openrouter_max_tokens,
         extra_headers={
             "HTTP-Referer": "https://github.com/echobrief",
             "X-Title": "EchoBrief",
