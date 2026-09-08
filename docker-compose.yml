@@ -48,9 +48,7 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-    ports:
-      # Host port configurable via API_PORT (default 8000). Container stays 8000.
-      - "${API_PORT:-8000}:8000"
+    # No host port: Nginx is the single public entry point (see nginx service).
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/echobrief
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -84,6 +82,26 @@ services:
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
     volumes:
       - uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on: [api]
+    # Same-origin API calls go through Nginx, so no build-time API URL needed.
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    depends_on: [frontend, api]
+    ports:
+      # Single public entry point. Override host port with WEB_PORT if 80 is taken.
+      - "${WEB_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     restart: unless-stopped
 
 volumes:
