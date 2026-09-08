@@ -13,6 +13,22 @@ in Postgres, and a **Next.js dashboard** lets you watch each brief move through
 
 ---
 
+## Demo
+
+Submit a brief → watch it flow through the pipeline → read the structured note:
+
+![EchoBrief demo](docs/img/demo.gif)
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/img/dashboard.png" alt="Dashboard" /><br/><sub><b>Dashboard</b> — submit a brief + live status list</sub></td>
+    <td width="33%"><img src="docs/img/brief-detail.png" alt="Brief detail" /><br/><sub><b>Brief detail</b> — pipeline timeline with real timestamps</sub></td>
+    <td width="33%"><img src="docs/img/structured-note.png" alt="Structured note" /><br/><sub><b>Structured note</b> — severity, timeline, root cause, action items</sub></td>
+  </tr>
+</table>
+
+---
+
 ## Architecture
 
 ```
