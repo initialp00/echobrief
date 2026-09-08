@@ -38,14 +38,20 @@ def publish(topic: str, payload: dict[str, Any], key: str | None = None) -> None
 
 
 def check_kafka() -> bool:
-    """Lightweight connectivity check for the health endpoint."""
+    """Lightweight connectivity check for the health endpoint.
+
+    We rely on a metadata fetch (partitions_for) rather than
+    bootstrap_connected(): kafka-python closes the initial bootstrap
+    connection once it has real broker metadata, so bootstrap_connected()
+    can report False even while the cluster is fully reachable.
+    """
     try:
         producer = get_producer()
-        # bootstrap_connected() reflects a live broker connection.
-        if producer.bootstrap_connected():
+        # A non-None result means we reached the cluster and got metadata.
+        # (Auto-create is enabled, so the topic resolves on first request.)
+        parts = producer.partitions_for(settings.kafka_topic_transcribe)
+        if parts is not None:
             return True
-        # Force a metadata refresh as a fallback probe.
-        producer.partitions_for(settings.kafka_topic_transcribe)
         return producer.bootstrap_connected()
     except KafkaError as exc:  # noqa: BLE001
         logger.warning("Kafka health check failed: %s", exc)
