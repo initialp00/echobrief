@@ -4,24 +4,25 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    /* Neo-brutalism palette: bright surfaces, pure-black borders. */
+    --background: 47 100% 92%; /* warm cream/yellow page */
+    --foreground: 0 0% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 222 47% 11%;
-    --radius: 0.6rem;
+    --card-foreground: 0 0% 4%;
+    --primary: 45 96% 55%; /* mustard */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 190 95% 76%; /* cyan */
+    --secondary-foreground: 0 0% 0%;
+    --muted: 47 45% 88%;
+    --muted-foreground: 0 0% 30%;
+    --accent: 330 90% 85%; /* pink */
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 90% 63%;
+    --destructive-foreground: 0 0% 0%;
+    --border: 0 0% 0%; /* pure black borders everywhere */
+    --input: 0 0% 0%;
+    --ring: 0 0% 0%;
+    --radius: 0.4rem;
   }
 
   * {
@@ -30,6 +31,17 @@
 
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(
+      hsl(0 0% 0% / 0.07) 1.2px,
+      transparent 1.2px
+    );
+    background-size: 18px 18px;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-black tracking-tight;
   }
 }

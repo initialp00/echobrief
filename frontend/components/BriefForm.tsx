@@ -118,7 +118,9 @@ export function BriefForm() {
       )}
 
       {error && (
-        <p className="rounded-md bg-red-50 p-2 text-sm text-red-700">{error}</p>
+        <p className="rounded-md border-2 border-black bg-red-400 p-2 text-sm font-bold text-black shadow-brutal-sm">
+          {error}
+        </p>
       )}
 
       <div className="flex items-center gap-2">

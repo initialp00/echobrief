@@ -86,8 +86,8 @@ export default function BriefDetailPage() {
           </Card>
 
           {brief.status === "failed" && (
-            <Card className="border-red-200">
-              <CardContent className="flex gap-2 pt-6 text-sm text-red-700">
+            <Card className="bg-red-400">
+              <CardContent className="flex gap-2 pt-6 text-sm font-bold text-black">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{brief.error_message ?? "Processing failed."}</span>
               </CardContent>

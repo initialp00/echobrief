@@ -4,40 +4,43 @@ import type { StructuredNoteData } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 
 const SEVERITY_STYLES: Record<string, string> = {
-  P1: "bg-red-600 text-white",
-  P2: "bg-orange-500 text-white",
-  P3: "bg-yellow-500 text-white",
-  P4: "bg-slate-400 text-white",
+  P1: "bg-red-500 text-black",
+  P2: "bg-orange-400 text-black",
+  P3: "bg-yellow-300 text-black",
+  P4: "bg-slate-300 text-black",
 };
 
 const RESOLUTION_STYLES: Record<string, string> = {
-  Resolved: "bg-green-100 text-green-700",
-  Monitoring: "bg-blue-100 text-blue-700",
-  Ongoing: "bg-orange-100 text-orange-700",
+  Resolved: "bg-lime-400 text-black",
+  Monitoring: "bg-sky-300 text-black",
+  Ongoing: "bg-orange-400 text-black",
 };
+
+const BADGE = "rounded-md border-2 border-black shadow-brutal-sm";
 
 export function StructuredNote({ note }: { note: StructuredNoteData }) {
   return (
     <div className="space-y-6">
       {/* Header: title + severity + resolution */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-xl font-semibold leading-snug">
+        <h2 className="text-xl font-black leading-snug">
           {note.incident_title}
         </h2>
         <div className="flex items-center gap-2">
           <span
             className={cn(
-              "rounded-md px-2.5 py-1 text-sm font-bold",
-              SEVERITY_STYLES[note.severity] ?? "bg-slate-400 text-white"
+              BADGE,
+              "px-2.5 py-1 text-sm font-black uppercase",
+              SEVERITY_STYLES[note.severity] ?? "bg-slate-300 text-black"
             )}
           >
             {note.severity}
           </span>
           <span
             className={cn(
-              "rounded-md px-2.5 py-1 text-sm font-medium",
-              RESOLUTION_STYLES[note.resolution_status] ??
-                "bg-slate-100 text-slate-700"
+              BADGE,
+              "px-2.5 py-1 text-sm font-bold uppercase",
+              RESOLUTION_STYLES[note.resolution_status] ?? "bg-slate-200 text-black"
             )}
           >
             {note.resolution_status}
@@ -47,7 +50,7 @@ export function StructuredNote({ note }: { note: StructuredNoteData }) {
 
       {/* Affected systems */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+        <h3 className="mb-2 text-xs font-black uppercase tracking-wide">
           Affected systems
         </h3>
         <div className="flex flex-wrap gap-2">
@@ -65,13 +68,13 @@ export function StructuredNote({ note }: { note: StructuredNoteData }) {
 
       {/* Timeline */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+        <h3 className="mb-2 text-xs font-black uppercase tracking-wide">
           Timeline
         </h3>
-        <ol className="space-y-2 border-l-2 border-slate-200 pl-4">
+        <ol className="space-y-2 border-l-4 border-black pl-4">
           {note.timeline.map((t, i) => (
             <li key={i} className="relative">
-              <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-slate-400" />
+              <span className="absolute -left-[23px] top-1.5 h-3 w-3 rounded-full border-2 border-black bg-primary" />
               <span className="font-mono text-xs text-muted-foreground">
                 {t.time}
               </span>
@@ -83,10 +86,10 @@ export function StructuredNote({ note }: { note: StructuredNoteData }) {
 
       {/* Root cause */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+        <h3 className="mb-2 text-xs font-black uppercase tracking-wide">
           Root cause
         </h3>
-        <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="flex gap-2 rounded-md border-2 border-black bg-yellow-200 p-3 text-sm font-medium text-black shadow-brutal-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{note.root_cause}</span>
         </div>
@@ -94,7 +97,7 @@ export function StructuredNote({ note }: { note: StructuredNoteData }) {
 
       {/* Action items */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+        <h3 className="mb-2 text-xs font-black uppercase tracking-wide">
           Action items
         </h3>
         <ul className="space-y-1.5">

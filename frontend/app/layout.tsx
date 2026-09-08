@@ -17,13 +17,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <header className="border-b bg-card">
+        <header className="border-b-4 border-black bg-primary">
           <div className="container flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <Radio className="h-4 w-4" />
+            <Link href="/" className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-black bg-black text-primary shadow-brutal-sm">
+                <Radio className="h-5 w-5" />
               </span>
-              <span className="text-lg">EchoBrief</span>
+              <span className="text-xl font-black uppercase tracking-tight">
+                EchoBrief
+              </span>
             </Link>
             <HealthIndicator />
           </div>

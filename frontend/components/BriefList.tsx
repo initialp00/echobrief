@@ -46,7 +46,7 @@ export function BriefList() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       {loaded && briefs.length === 0 && (
-        <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border-2 border-dashed border-black p-6 text-center text-sm font-medium text-muted-foreground">
           No briefs yet. Submit one to see the pipeline in action.
         </p>
       )}
@@ -56,10 +56,10 @@ export function BriefList() {
           <li key={b.id}>
             <Link
               href={`/briefs/${b.id}`}
-              className="flex items-center justify-between rounded-lg border bg-card p-3 transition-colors hover:bg-accent"
+              className="flex items-center justify-between gap-3 rounded-md border-2 border-black bg-card p-3 shadow-brutal-sm transition-all hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-brutal"
             >
               <div className="min-w-0">
-                <p className="truncate font-medium">{b.title}</p>
+                <p className="truncate font-bold">{b.title}</p>
                 <p className="text-xs text-muted-foreground">
                   {b.engineer_name} · {formatTime(b.created_at)}
                 </p>

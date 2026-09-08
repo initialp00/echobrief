@@ -2,12 +2,12 @@ import { cn } from "@/lib/utils";
 import type { BriefStatus } from "@/lib/api";
 
 const STATUS_STYLES: Record<BriefStatus, string> = {
-  received: "bg-slate-200 text-slate-700",
-  queued: "bg-blue-100 text-blue-700",
-  transcribing: "bg-yellow-100 text-yellow-800",
-  drafting: "bg-orange-100 text-orange-800",
-  ready: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
+  received: "bg-slate-200 text-black",
+  queued: "bg-sky-300 text-black",
+  transcribing: "bg-yellow-300 text-black",
+  drafting: "bg-orange-400 text-black",
+  ready: "bg-lime-400 text-black",
+  failed: "bg-red-400 text-black",
 };
 
 export function StatusBadge({
@@ -21,7 +21,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
+        "inline-flex items-center gap-1.5 rounded-md border-2 border-black px-2.5 py-0.5 text-xs font-bold uppercase tracking-tight shadow-brutal-sm",
         STATUS_STYLES[status],
         className
       )}

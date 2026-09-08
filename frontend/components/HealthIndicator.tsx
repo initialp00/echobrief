@@ -27,15 +27,11 @@ export function HealthIndicator() {
 
   const label = ok === null ? "checking" : ok ? "healthy" : "degraded";
   return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex items-center gap-2 rounded-md border-2 border-black bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-tight shadow-brutal-sm">
       <span
         className={cn(
-          "h-2.5 w-2.5 rounded-full",
-          ok === null
-            ? "bg-slate-300"
-            : ok
-              ? "bg-green-500"
-              : "bg-red-500"
+          "h-2.5 w-2.5 rounded-full border border-black",
+          ok === null ? "bg-slate-300" : ok ? "bg-lime-400" : "bg-red-500"
         )}
       />
       <span>System {label}</span>
