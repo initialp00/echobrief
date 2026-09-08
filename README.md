@@ -145,13 +145,64 @@ Statuses: `received → queued → transcribing → drafting → ready | failed`
 All API routes are served under `/api/*` via Nginx (which strips the prefix
 before proxying to FastAPI).
 
-| Method | Path | Description |
-|---|---|---|
-| `GET`  | `/api/health` | DB + Kafka connectivity |
-| `POST` | `/api/briefs` | Create a brief (enqueues async processing) |
-| `GET`  | `/api/briefs` | List briefs (`?status=&limit=&offset=`) |
-| `GET`  | `/api/briefs/{id}` | Full brief incl. structured note when ready |
-| `GET`  | `/api/briefs/{id}/note` | Structured note JSON (409 until ready) |
+| Method | Path | Description | Success | Errors |
+|---|---|---|---|---|
+| `GET`  | `/api/health` | DB + Kafka connectivity | `200` | — |
+| `POST` | `/api/briefs` | Create a brief (enqueues async processing) | `201` | `422` invalid body, `503` bus down |
+| `GET`  | `/api/briefs` | List briefs (`?status=&limit=&offset=`) | `200` | `422` bad query |
+| `GET`  | `/api/briefs/{id}` | Full brief incl. structured note when ready | `200` | `404` not found |
+| `GET`  | `/api/briefs/{id}/note` | Structured note JSON | `200` | `404` not found, `409` not ready |
+
+> Swagger UI (interactive) is at **`/docs`**, and the OpenAPI spec at **`/openapi.json`**.
+
+### Endpoint reference
+
+**`GET /api/health`** — liveness of dependencies.
+```json
+{ "status": "ok", "db": "connected", "kafka": "connected" }
+```
+
+**`POST /api/briefs`** — create a brief and start the async pipeline.
+Request body:
+```jsonc
+{
+  "title": "API gateway 5xx spike",       // required
+  "engineer_name": "Nishil",              // required
+  "ingest_type": "transcript",            // required: "transcript" | "audio_url" | "audio_file"
+  "transcript": "At 14:32 UTC ...",       // required when ingest_type = "transcript"
+  "audio_url": "https://.../brief.wav"    // required when ingest_type = "audio_url"
+}
+```
+Response `201`:
+```json
+{ "id": "uuid", "title": "API gateway 5xx spike", "status": "queued", "created_at": "2026-09-08T14:32:01Z" }
+```
+
+**`GET /api/briefs`** — list briefs, newest first.
+Query params: `status` (optional filter), `limit` (1–100, default 20), `offset` (default 0).
+Response `200`:
+```json
+[
+  { "id": "uuid", "title": "...", "engineer_name": "Nishil",
+    "status": "ready", "created_at": "...", "completed_at": "..." }
+]
+```
+
+**`GET /api/briefs/{id}`** — full brief with per-stage timestamps + note when ready.
+Response `200`:
+```json
+{
+  "id": "uuid", "title": "...", "engineer_name": "Nishil", "ingest_type": "transcript",
+  "status": "ready", "error_message": null,
+  "created_at": "...", "queued_at": "...", "transcribed_at": "...",
+  "drafted_at": "...", "completed_at": "...",
+  "transcript": "At 14:32 UTC ...",
+  "structured_note": { "...": "see below, or null until ready" }
+}
+```
+
+**`GET /api/briefs/{id}/note`** — just the structured note JSON. Returns `409`
+with the current status until the brief is `ready`.
 
 ### Examples
 
