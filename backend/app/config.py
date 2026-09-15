@@ -14,12 +14,15 @@ class Settings(BaseSettings):
     kafka_topic_structure: str = "echobrief.structure"
     kafka_consumer_group: str = "echobrief-workers"
 
-    # LLM (OpenRouter, OpenAI-compatible)
+    # LLM + STT (OpenRouter)
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Structures transcript → incident note JSON
     openrouter_model: str = "anthropic/claude-sonnet-4.5"
     # Cap completion size (a structured note is small); keeps free-tier keys happy.
     openrouter_max_tokens: int = 1500
+    # Speech-to-text for audio_url / audio_file (OpenRouter /audio/transcriptions)
+    openrouter_stt_model: str = "openai/whisper-1"
 
     # Where uploaded audio files are stored
     upload_dir: str = "/app/uploads"

@@ -57,7 +57,7 @@ Submit a brief → watch it flow through the pipeline → read the structured no
 │                   │ consume echobrief.transcribe                │
 │                   ▼                                             │
 │            ┌──────────────┐ UPDATE transcribing                │
-│            │    Worker    │ mock / real (Whisper) transcription │
+│            │    Worker    │ OpenRouter Whisper → transcript     │
 │            │  (consumer)  │ publish echobrief.structure ──────► │
 │            │              │ consume echobrief.structure         │
 │            │              │ UPDATE drafting                     │
@@ -80,7 +80,7 @@ Submit a brief → watch it flow through the pipeline → read the structured no
 | Message bus | Apache Kafka (+ Zookeeper) | Real async handoff, two-stage pipeline |
 | Worker | Python consumer (separate process) | transcribe → structure → update DB |
 | DB | PostgreSQL 16 | Briefs + structured notes, persisted status machine |
-| LLM | claude-sonnet via OpenRouter | Structures transcript into JSON note (offline fallback if no key) |
+| LLM + STT | OpenRouter | Whisper (`openai/whisper-1`) for audio→text; Claude Sonnet for structured notes |
 
 ### Status machine
 ```
@@ -103,7 +103,7 @@ Every transition is persisted with a timestamp: `created_at`, `queued_at`,
 git clone <repo>
 cd echobrief
 cp .env.example .env        # Windows: copy .env.example .env
-# (optional) add your OPENROUTER_API_KEY to .env
+# Required for a live demo: put your real OPENROUTER_API_KEY in .env
 docker compose up --build
 ```
 
@@ -116,9 +116,12 @@ Then open:
 > `WEB_PORT=8090 docker compose up --build` → open http://localhost:8090
 > (Everything is same-origin behind Nginx, so the UI just works on any port.)
 
-> **No API key?** No problem. If `OPENROUTER_API_KEY` is missing/placeholder,
-> the worker uses a deterministic **offline structurer** so the *entire async
-> pipeline still runs end-to-end*. Add a key to get real claude-sonnet output.
+> **Live demo needs an OpenRouter key.** The same key powers:
+> 1. **Speech-to-text** — `OPENROUTER_STT_MODEL` (default `openai/whisper-1`) for `audio_url` / `audio_file`
+> 2. **Note structuring** — `OPENROUTER_MODEL` (default `anthropic/claude-sonnet-4.5`)
+>
+> Without a key, transcript ingest can still complete via an offline structurer
+> fallback, but **audio ingest will fail** (by design — no mock transcripts).
 
 The API container applies the schema on startup (`init_db.py`, idempotent and
 retrying), so the first `docker compose up` is all you need.
@@ -139,6 +142,19 @@ retrying), so the first `docker compose up` is all you need.
    shows a live **system health** dot (green when `/api/health` is `ok`).
 
 The UI is self-explanatory — an evaluator can drive the whole flow without a terminal.
+
+### Live demo checklist (local call)
+
+1. Put a real `OPENROUTER_API_KEY` in `.env` (see `.env.example`).
+2. `docker compose up --build` → open http://localhost (or `WEB_PORT`).
+3. **Transcript path:** Load example → Submit → watch status → structured note.
+4. **Audio path:** in another terminal, from `samples/`:
+   ```powershell
+   python -m http.server 8055
+   ```
+   Submit ingest `audio_url` =
+   `http://host.docker.internal:8055/audio/01-api-gateway-redis.wav`
+   → OpenRouter Whisper transcribes → Claude structures the note.
 
 ---
 
@@ -275,15 +291,26 @@ curl http://localhost/api/health               # {"status":"ok","db":"connected"
 
 ---
 
-## Transcription: mock vs real
+## Transcription (live via OpenRouter)
 
-The demo uses **mock transcription** for audio paths (returns a realistic
-incident transcript) so the image stays small and the pipeline is network-free.
-The **transcript** ingest path is fully real (uses the supplied text verbatim).
+Both ingest paths are live:
 
-To enable real speech-to-text, install `faster-whisper` and swap
-`_mock_transcribe` for the documented `_real_transcribe` in
-[`backend/worker/transcriber.py`](backend/worker/transcriber.py).
+| Ingest | What happens |
+|---|---|
+| `transcript` | Text is used as-is (no STT). Then Claude structures it. |
+| `audio_url` / `audio_file` | Worker downloads/opens the file → **OpenRouter STT** (`OPENROUTER_STT_MODEL`, default `openai/whisper-1`) → Claude structures the result. |
+
+Swap STT model anytime (same key), e.g. `openai/gpt-transcribe` or others from the [OpenRouter speech-to-text collection](https://openrouter.ai/collections/speech-to-text-models).
+
+For sample `.wav` files, serve them over HTTP so Docker can reach them:
+
+```powershell
+# from the samples/ folder
+python -m http.server 8055
+```
+
+Then submit `audio_url`:
+`http://host.docker.internal:8055/audio/01-api-gateway-redis.wav`
 
 ---
 
@@ -294,12 +321,12 @@ To enable real speech-to-text, install `faster-whisper` and swap
    commits → at-least-once). Redis pub/sub would drop messages with no live consumer.
 
 2. **Two-topic pipeline (`transcribe` + `structure`)** — separating stages lets
-   transcription (CPU-heavy, e.g. Whisper) and structuring (I/O-heavy LLM call)
-   scale independently, and makes each stage individually retryable.
+   transcription (OpenRouter STT) and structuring (Claude) scale / retry
+   independently.
 
-3. **Mock transcription for the demo** — real Whisper adds a heavy dependency
-   (model download + CPU/GPU inference). Mocking demonstrates the async pipeline
-   correctly; production path is documented (`faster-whisper`).
+3. **OpenRouter for both STT and structuring** — one API key, no local Whisper
+   weights in the image. Audio must be a real reachable URL/file; failures mark
+   the brief `failed` instead of inventing a mock transcript.
 
 4. **Status machine in the DB** — every transition is persisted with a timestamp,
    giving a full audit trail and powering the UI status timeline without extra queries.
@@ -315,8 +342,9 @@ To enable real speech-to-text, install `faster-whisper` and swap
    but the async pipeline is invisible without a UI. Watching a brief flow through
    the status machine in real time demonstrates the architecture far better than curl.
 
-8. **LLM fallback** — a deterministic offline structurer keeps the pipeline runnable
-   without an API key or network; real claude-sonnet is used whenever a key is present.
+8. **LLM fallback (transcript-only)** — if the structuring key is missing, a
+   deterministic offline structurer keeps transcript demos runnable; audio always
+   requires a live STT key.
 
 ---
 

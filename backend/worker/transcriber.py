@@ -1,26 +1,19 @@
 """Transcription stage.
 
-For the demo this returns a realistic mock transcript when given audio, and
-uses the supplied transcript verbatim for the transcript ingest path.
+- transcript ingest: use the supplied text as-is
+- audio ingest: download (or open local file) → OpenRouter speech-to-text
 
-REAL WHISPER PATH (documented, intentionally not enabled for the demo):
---------------------------------------------------------------------------
-The mock keeps the image small and the pipeline network-free. To run real
-speech-to-text, install `faster-whisper` and replace `_mock_transcribe`:
-
-    from faster_whisper import WhisperModel
-    _model = WhisperModel("base", device="cpu", compute_type="int8")
-
-    def _real_transcribe(path: str) -> str:
-        segments, _info = _model.transcribe(path, language="en")
-        return " ".join(seg.text.strip() for seg in segments).strip()
-
-Trade-off: real inference needs a model download (~150MB for `base`) and is
-CPU/GPU heavy, which is why it is gated behind documentation for evaluation.
+Requires OPENROUTER_API_KEY. Uses OPENROUTER_STT_MODEL (default openai/whisper-1).
 """
+from __future__ import annotations
+
+import base64
 import logging
+import mimetypes
 import os
 import uuid
+from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -28,78 +21,118 @@ from app.config import settings
 
 logger = logging.getLogger("echobrief.transcriber")
 
-MOCK_TRANSCRIPT = """
-At 14:32 UTC we started seeing elevated 5xx errors on the API gateway.
-Error rate peaked at 23 percent around 14:38. Auth service was returning
-connection timeouts. Root cause was Redis connection pool exhaustion after
-a config change deployed at 14:15. We rolled back the config at 14:47
-and error rates normalised by 14:52. Action items: increase connection
-pool size, add connection pool monitoring alert, add config change
-freeze window during peak hours.
-""".strip()
-
-# Faithful transcripts for the provided sample audio files (see samples/).
-# When the audio source (URL or filename) matches one of these keys, the mock
-# transcriber returns the matching transcript so the demo produces a correct
-# note for that specific audio. Unknown audio falls back to MOCK_TRANSCRIPT.
-# (With real Whisper wired in, this table is unnecessary.)
-SAMPLE_TRANSCRIPTS: dict[str, str] = {
-    "01-api-gateway-redis": MOCK_TRANSCRIPT,
-    "02-checkout-latency-db": (
-        "Around 21:05 UTC checkout requests started timing out. About 40 percent "
-        "of users could not complete purchases. The payments service was hitting a "
-        "connection limit on the primary database after an autoscaling "
-        "misconfiguration pushed too many pods at 20:50. We reduced the max pod "
-        "count and restarted the payments service at 21:20, and checkout recovered "
-        "by 21:28. Follow ups: cap the payments pod count, add a database "
-        "connection saturation alert, and review the autoscaling policy."
-    ),
-    "03-dns-resolution-outage": (
-        "At 08:14 UTC internal services could not resolve DNS for the payments and "
-        "notifications domains, causing a complete outage for background jobs. The "
-        "cause was an expired internal certificate on the DNS resolver that was not "
-        "rotated by automation. We manually rotated the certificate and restarted "
-        "the resolver at 08:39, and resolution recovered by 08:45. Action items: "
-        "fix the certificate rotation automation, add an expiry alert 30 days out, "
-        "and add a synthetic DNS health check."
-    ),
-    "04-cache-stampede-minor": (
-        "At 12:03 UTC we saw a brief latency bump on the product catalog service "
-        "after a cache node restarted, triggering a small cache stampede. Impact "
-        "was minor, a few slow requests for about two minutes. No user reports. The "
-        "cache warmed up and latency returned to normal by 12:06. Action items: add "
-        "request coalescing on cache misses and stagger cache node restarts."
-    ),
-}
+_SUPPORTED_EXTS = {".wav", ".mp3", ".flac", ".m4a", ".ogg", ".webm", ".aac", ".mp4"}
 
 
-def _mock_transcribe(source: str) -> str:
-    """Return a transcript for mocked audio.
+def _require_api_key() -> None:
+    if not settings.llm_enabled:
+        raise RuntimeError(
+            "OPENROUTER_API_KEY is required for audio transcription "
+            "(OpenRouter speech-to-text). Set it in .env and restart."
+        )
 
-    If the source (audio URL or filename) matches a known sample, return that
-    sample's transcript so the note is faithful; otherwise return the generic
-    canned incident transcript.
-    """
-    src = (source or "").lower()
-    for key, transcript in SAMPLE_TRANSCRIPTS.items():
-        if key in src:
-            logger.info("Mock-transcribing %s -> matched sample '%s'.", source, key)
-            return transcript
-    logger.info("Mock-transcribing %s -> generic canned transcript.", source)
-    return MOCK_TRANSCRIPT
+
+def _extension_from_url_or_name(source: str) -> str:
+    path = urlparse(source).path if "://" in source else source
+    ext = Path(path).suffix.lower()
+    if ext in _SUPPORTED_EXTS:
+        return ext
+    return ".wav"
+
+
+def _format_from_path(path: str) -> str:
+    ext = Path(path).suffix.lower().lstrip(".")
+    if ext == "mp4":
+        return "m4a"
+    if ext in {"wav", "mp3", "flac", "m4a", "ogg", "webm", "aac"}:
+        return ext
+    return "wav"
 
 
 async def _download_audio(audio_url: str) -> str:
-    """Download audio to the uploads dir; returns local path."""
+    """Download audio to the uploads dir; returns local path with a real extension."""
     os.makedirs(settings.upload_dir, exist_ok=True)
-    dest = os.path.join(settings.upload_dir, f"{uuid.uuid4()}.audio")
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+    ext = _extension_from_url_or_name(audio_url)
+    dest = os.path.join(settings.upload_dir, f"{uuid.uuid4()}{ext}")
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
         resp = await client.get(audio_url)
         resp.raise_for_status()
+        ctype = (resp.headers.get("content-type") or "").split(";")[0].strip().lower()
+        guessed = mimetypes.guess_extension(ctype) if ctype.startswith("audio/") else None
+        if (
+            guessed
+            and Path(dest).suffix.lower() == ".wav"
+            and guessed.lower() in _SUPPORTED_EXTS
+        ):
+            dest = os.path.splitext(dest)[0] + guessed.lower()
         with open(dest, "wb") as fh:
             fh.write(resp.content)
-    logger.info("Downloaded audio from %s -> %s", audio_url, dest)
+    logger.info(
+        "Downloaded audio from %s -> %s (%s bytes)",
+        audio_url,
+        dest,
+        os.path.getsize(dest),
+    )
     return dest
+
+
+def _transcribe_file_openrouter(path: str) -> str:
+    """POST base64 audio to OpenRouter /api/v1/audio/transcriptions."""
+    _require_api_key()
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Audio file not found: {path}")
+    if os.path.getsize(path) == 0:
+        raise ValueError(f"Audio file is empty: {path}")
+
+    fmt = _format_from_path(path)
+    with open(path, "rb") as fh:
+        audio_b64 = base64.b64encode(fh.read()).decode("ascii")
+
+    url = settings.openrouter_base_url.rstrip("/") + "/audio/transcriptions"
+    headers = {
+        "Authorization": f"Bearer {settings.openrouter_api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/echobrief",
+        "X-Title": "EchoBrief",
+    }
+    payload = {
+        "model": settings.openrouter_stt_model,
+        "input_audio": {"data": audio_b64, "format": fmt},
+        "language": "en",
+    }
+    logger.info(
+        "OpenRouter STT model=%s file=%s format=%s bytes=%s",
+        settings.openrouter_stt_model,
+        path,
+        fmt,
+        os.path.getsize(path),
+    )
+    with httpx.Client(timeout=120) as client:
+        resp = client.post(url, headers=headers, json=payload)
+        if resp.status_code >= 400:
+            raise RuntimeError(
+                f"OpenRouter STT failed ({resp.status_code}): {resp.text[:500]}"
+            )
+        data = resp.json()
+
+    text = (data.get("text") or "").strip()
+    if not text:
+        raise RuntimeError(f"OpenRouter STT returned empty transcript: {data!r}")
+    logger.info("OpenRouter STT ok (%s chars)", len(text))
+    return text
+
+
+def _resolve_local_audio(path_or_name: str) -> str:
+    """Resolve audio_file ingest to a path under the shared uploads volume."""
+    if os.path.isabs(path_or_name) and os.path.isfile(path_or_name):
+        return path_or_name
+    candidate = os.path.join(settings.upload_dir, path_or_name)
+    if os.path.isfile(candidate):
+        return candidate
+    raise FileNotFoundError(
+        f"audio_file not found under uploads: {path_or_name!r} "
+        f"(looked in {settings.upload_dir})"
+    )
 
 
 async def transcribe(
@@ -114,21 +147,13 @@ async def transcribe(
     if ingest_type == "audio_url":
         if not audio_url:
             raise ValueError("ingest_type=audio_url but no audio_url provided")
-        # Best-effort download. Since transcription is mocked for the demo, a
-        # download failure (e.g. placeholder URL) still yields a mock transcript
-        # rather than failing the brief. With real Whisper wired in, you would
-        # let a download error propagate to the 'failed' status instead.
-        try:
-            await _download_audio(audio_url)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Audio download failed (%s); using mock transcript.", exc)
-        # Key the mock off the original URL so provided sample files (e.g.
-        # .../03-dns-resolution-outage.wav) yield their matching transcript.
-        # For real STT, transcribe the downloaded file instead.
-        return _mock_transcribe(audio_url)
+        path = await _download_audio(audio_url)
+        return _transcribe_file_openrouter(path)
 
     if ingest_type == "audio_file":
-        # File is expected to already exist under the shared uploads volume.
-        return _mock_transcribe(audio_url or "uploaded-file")
+        if not audio_url:
+            raise ValueError("ingest_type=audio_file but no file path provided")
+        path = _resolve_local_audio(audio_url)
+        return _transcribe_file_openrouter(path)
 
     raise ValueError(f"Unknown ingest_type: {ingest_type}")

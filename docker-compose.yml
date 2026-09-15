@@ -58,6 +58,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-sonnet-4.5}
+      - OPENROUTER_STT_MODEL=${OPENROUTER_STT_MODEL:-openai/whisper-1}
     volumes:
       - uploads:/app/uploads
     restart: unless-stopped
@@ -71,6 +72,9 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    # So audio_url can reach samples served on the host (python -m http.server).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/echobrief
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -80,6 +84,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-sonnet-4.5}
+      - OPENROUTER_STT_MODEL=${OPENROUTER_STT_MODEL:-openai/whisper-1}
     volumes:
       - uploads:/app/uploads
     restart: unless-stopped

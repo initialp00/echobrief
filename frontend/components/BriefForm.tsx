@@ -112,7 +112,8 @@ export function BriefForm() {
             required
           />
           <p className="text-xs text-muted-foreground">
-            Demo uses mock transcription for audio; the transcript path is real.
+            Must be a reachable URL (wav/mp3/…). Transcribed live via OpenRouter
+            Whisper. Serve samples locally if needed (see samples/README).
           </p>
         </div>
       )}

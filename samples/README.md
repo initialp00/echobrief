@@ -1,7 +1,7 @@
 # EchoBrief — sample incident briefs
 
-Ready-made incident briefs for exercising the pipeline. Each item has a spoken
-**audio** file and its matching **transcript** text.
+Ready-made incident briefs for exercising the **live** pipeline. Each item has a
+spoken **audio** file and its matching **transcript** text.
 
 ```
 samples/
@@ -21,56 +21,38 @@ samples/
 
 ## How to use them
 
-Open the dashboard (**http://localhost** — or the `WEB_PORT` you set, e.g.
-http://localhost:8090) and submit a brief. There are two ingest paths:
+Open the dashboard (**http://localhost** — or the `WEB_PORT` you set) and submit
+a brief. Set a real `OPENROUTER_API_KEY` in `.env` first.
 
-### 1. Transcript path (fully real, recommended)
-Copy the contents of any file in `transcripts/` into the **Transcript** box on
-the dashboard (ingest type = `transcript`) and submit. The text is used verbatim
-and structured by claude-sonnet — no transcription step involved.
+### 1. Transcript path
+Copy any file in `transcripts/` into the **Transcript** box (`ingest_type=transcript`).
+Text is used as-is → Claude Sonnet structures the note via OpenRouter.
 
-### 2. Audio path (`audio_url`)
-On the dashboard choose ingest type **`audio_url`** and paste a URL whose file
-name matches a sample, e.g.:
-
-```
-http://demo/03-dns-resolution-outage.wav
-```
-
-> **How transcription works in the demo:** audio is **mock-transcribed** (per the
-> spec — real Whisper is documented but not enabled). The mock recognises the
-> sample file name in the URL and returns *that brief's* transcript, so you get a
-> faithful note for the audio you picked. Unknown audio yields a generic incident
-> transcript. The URL does **not** need to be reachable — download is best-effort.
-
-### 2b. Audio path with a real, reachable URL (optional)
-If you want the worker to actually **download** the file, serve this folder over
-HTTP and use a `host.docker.internal` URL (reachable from inside the containers):
+### 2. Audio path (live OpenRouter Whisper)
+Serve the samples so Docker can download them:
 
 ```powershell
 # from the samples/ folder
 python -m http.server 8055
 ```
 
-Then submit `audio_url`:
+On the dashboard choose **`audio_url`** and paste:
+
 ```
-http://host.docker.internal:8055/audio/03-dns-resolution-outage.wav
+http://host.docker.internal:8055/audio/01-api-gateway-redis.wav
 ```
-The file is downloaded, then mock-transcribed (matched by file name).
+
+Flow: worker downloads the `.wav` → OpenRouter STT (`openai/whisper-1` by default)
+→ Claude structures the real transcript. No mock text.
 
 ### Via curl
 ```bash
-curl -X POST http://localhost:8090/api/briefs \
+curl -X POST http://localhost/api/briefs \
   -H "Content-Type: application/json" \
-  -d '{"title":"DNS outage","engineer_name":"Marcus","ingest_type":"audio_url","audio_url":"http://demo/03-dns-resolution-outage.wav"}'
+  -d '{"title":"DNS outage","engineer_name":"Marcus","ingest_type":"audio_url","audio_url":"http://host.docker.internal:8055/audio/03-dns-resolution-outage.wav"}'
 ```
 
 ---
-
-## Enabling real speech-to-text (production path)
-The `.wav` files are genuine spoken audio, so they also work with real STT. To
-transcribe them for real, install `faster-whisper` and swap `_mock_transcribe`
-for `_real_transcribe` in [`backend/worker/transcriber.py`](../backend/worker/transcriber.py).
 
 ## Regenerating the audio
 ```powershell
